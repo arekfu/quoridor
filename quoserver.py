@@ -80,7 +80,10 @@ class ServerBoard(quoboard.Board):
             return False
 
 class QuoServer:
+
     def __init__(self):
+        self.read_config()
+
         self.serverboard=ServerBoard()
         for i in range(60):
             self.serverboard.add_barrier(quoboard.Barrier(
@@ -92,5 +95,50 @@ class QuoServer:
             self.serverboard.move_pawn(self.serverboard.pp[0].h,
                 random.choice([up,right,down,left]))
         self.serverboard.pretty_print_ascii()
+
+    def read_config(self):
+        """Read the configuration file using the ConfigParser module"""
+
+        import ConfigParser
+        import os.path
+        try:
+            cfgfilename=os.path.expanduser('~/.quoserver')
+            f=open(cfgfilename,'r')
+        except IOError:
+            logging.warning('Configuration file %s does not exist, creating a new one', cfgfilename) 
+            self.create_default_config(cfgfilename)
+            try:
+                f=open(cfgfilename,'r')
+            except:
+                logging.error('Cannot read configuration file %s, bombing out', cfgfilename)
+                raise
+
+        config = ConfigParser.RawConfigParser()
+        config.read(f)
+        f.close()
+
+    def create_default_config(self,cfgfilename):
+        """Create a config file with default option values"""
+        import ConfigParser
+        config = ConfigParser.RawConfigParser()
+
+        # Dictionary of default options and values
+        opt_dic = {
+            'dummy':    0
+        }
+
+        config.add_section('Main')
+        for opt, val in opt_dic.items():
+            config.set('Main', opt, val)
+
+        try:
+            f=open(cfgfilename,'w')
+        except:
+            logging.critical('Cannot open configuration file %s for writing, bombing out', cfgfilename)
+            raise
+
+        config.write(f)
+        f.close()
+
 
 my_quoridor_server=QuoServer()
