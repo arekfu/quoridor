@@ -3,6 +3,14 @@
 # For debugging!
 import pdb
 
+# Set up logging
+import logging
+logging.basicConfig(level=logging.DEBUG,
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        datefmt='%a, %d %b %Y %H:%M:%S')
+
+
+# Global variables
 global up, right, down, left, visited
 global vdir
 
@@ -17,6 +25,9 @@ vdir={
                 down:   (0,1),
                 left:   (-1,0)
             }
+
+
+# Class definitions
 
 class Barrier:
     """Barrier class"""
@@ -162,13 +173,13 @@ class Board:
             # Check if new barrier closes off one of the pawns
             if self.are_pawns_closed_off():
                 self.remove_barrier_from_map(barrier)
-                print "Barrier ", barrier.position, barrier.direction, " closes off some pawns, rejected"
+                logging.info("Barrier %s, %d, len=%d closes off some pawns, rejected", str(barrier.position), barrier.direction, barrier.length)
                 return False
             else:
                 self.barriers.append(barrier)
                 return True
         else:
-            print "Illegal barrier ", barrier.position, barrier.direction, " rejected"
+            logging.info("Barrier %s, %d, len=%d is illegal, rejected", str(barrier.position), barrier.direction, barrier.length)
             return False
 
     def add_barrier_to_map(self,barrier):
