@@ -2,6 +2,7 @@
 
 import quoboard
 import random
+
 global up,right,down,left,vdir
 vdir = quoboard.vdir
 up = quoboard.up
@@ -9,8 +10,10 @@ right = quoboard.right
 down = quoboard.down
 left = quoboard.left
 
+
 class Pawn:
     """Pawn class"""
+
     def __init__(self,x,y,symbol,goal):
         self.position=(x,y)
         self.symbol=symbol
@@ -23,7 +26,8 @@ class Pawn:
        return self.position
 
 class ServerBoard(quoboard.Board):
-    """Board class to be used by server applications
+    """Board class to be used by server applications.
+
     Includes methods to add barriers and update the table of allowed moves"""
 
     def __init__(self,side=9,nplayers=4):
@@ -67,15 +71,18 @@ class ServerBoard(quoboard.Board):
         else:
             return False
 
+class QuoServer:
+    def __init__(self):
+        self.serverboard=ServerBoard()
+        for i in range(60):
+            self.serverboard.add_barrier(quoboard.Barrier(
+                random.randint(0,self.serverboard.side-1),
+                random.randint(0,self.serverboard.side-1),
+                random.choice([up,right,down,left]),
+                2))
+        for i in range(60):
+            self.serverboard.move_pawn(self.serverboard.pp[0].h,
+                random.choice([up,right,down,left]))
+        self.serverboard.pretty_print_ascii()
 
-MyServerBoard=ServerBoard()
-for i in range(60):
-    MyServerBoard.add_barrier(quoboard.Barrier(
-        random.randint(0,MyServerBoard.side-1),
-        random.randint(0,MyServerBoard.side-1),
-        random.choice([up,right,down,left]),
-        2))
-for i in range(60):
-    MyServerBoard.move_pawn(MyServerBoard.pp[0].h,
-        random.choice([up,right,down,left]))
-MyServerBoard.pretty_print_ascii()
+my_quoridor_server=QuoServer()
