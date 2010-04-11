@@ -42,7 +42,7 @@ class Barrier:
             else:
                 self.direction=down
 
-    def intersectsWith(self,other):
+    def intersects_with(self,other):
         """Determine if two barriers intersect each other"""
         # Barriers in the same direction
         if self.direction == other.direction:
@@ -85,15 +85,15 @@ class Board:
             self.moves[i][side-1] &= ~down
         self.barriers=[]
 
-    def isPawnPositionLegal(self,x,y):
+    def is_pawn_position_legal(self,x,y):
         """Check if the proposed pawn position is within the board limits"""
         return ( 0 <= x < self.side and 0 <= y < self.side)
 
-    def isMoveAllowed(self,position,direction):
+    def is_move_allowed(self,position,direction):
         """Check if the proposed move is allowed by barriers"""
         return ( self.moves[position[0]][position[1]] & direction )
 
-    def isBarrierLegal(self,barrier):
+    def is_barrier_legal(self,barrier):
         """Check if both ends of the proposed barrier are within the board
         limits"""
         x,y=barrier.position
@@ -103,32 +103,32 @@ class Board:
         else:
             return ( 0 < x < self.side and 0 <= y <= self.side and 0 <= y2 <= self.side )
 
-    def checkBarrier(self,barrier):
+    def check_barrier(self,barrier):
         """Check if barrier is allowed"""
 
         # Check if the barrier is allowed
-        if not self.isBarrierLegal( barrier ):
+        if not self.is_barrier_legal( barrier ):
             return False
 
         # Check if new barrier overlaps with existing barriers
         for oldbarrier in self.barriers:
-            if barrier.intersectsWith(oldbarrier): return False
+            if barrier.intersects_with(oldbarrier): return False
 
         # Barrier is good
         return True
 
-    def closedOffPawns(self):
+    def are_pawns_closed_off(self):
         """Check if any of the pawns are sealed off (not allowed by the
         rules)"""
 
         for p in self.pp:
             self.movesCO = [ line[:] for line in self.moves[:] ]
             #if p.position == (0,4): pdb.set_trace()
-            if not self.canWin(p.position,p.goal): return True
+            if not self.can_win(p.position,p.goal): return True
 
         return False
 
-    def canWin(self,p,g):
+    def can_win(self,p,g):
         """Recursive function to determine if position p is connected with the
         g side of the board"""
         if g == up:
@@ -145,23 +145,23 @@ class Board:
         can=False
 
         if self.movesCO[p[0]][p[1]] & up and not self.movesCO[p[0]][p[1]-1] & visited:
-            can |= self.canWin((p[0],p[1]-1),g)
+            can |= self.can_win((p[0],p[1]-1),g)
         if self.movesCO[p[0]][p[1]] & right and not self.movesCO[p[0]+1][p[1]] & visited:
-            can |= self.canWin((p[0]+1,p[1]),g)
+            can |= self.can_win((p[0]+1,p[1]),g)
         if self.movesCO[p[0]][p[1]] & down and not self.movesCO[p[0]][p[1]+1] & visited:
-            can |= self.canWin((p[0],p[1]+1),g)
+            can |= self.can_win((p[0],p[1]+1),g)
         if self.movesCO[p[0]][p[1]] & left and not self.movesCO[p[0]-1][p[1]] & visited:
-            can |= self.canWin((p[0]-1,p[1]),g)
+            can |= self.can_win((p[0]-1,p[1]),g)
 
         return can
 
-    def addBarrier(self,barrier):
+    def add_barrier(self,barrier):
         """Add a new barrier if allowed"""
-        if self.checkBarrier(barrier):
-            self.addBarrierToMap(barrier)
+        if self.check_barrier(barrier):
+            self.add_barrier_to_map(barrier)
             # Check if new barrier closes off one of the pawns
-            if self.closedOffPawns():
-                self.removeBarrierFromMap(barrier)
+            if self.are_pawns_closed_off():
+                self.remove_barrier_from_map(barrier)
                 print "Barrier ", barrier.position, barrier.direction, " closes off some pawns, rejected"
                 return False
             else:
@@ -171,7 +171,7 @@ class Board:
             print "Illegal barrier ", barrier.position, barrier.direction, " rejected"
             return False
 
-    def addBarrierToMap(self,barrier):
+    def add_barrier_to_map(self,barrier):
         """Update the moves map with the new barrier"""
         for pos in barrier.nodes():
             if barrier.direction == right:
@@ -181,7 +181,7 @@ class Board:
                 self.moves[pos[0]-1][pos[1]] &= ~right
                 self.moves[pos[0]][pos[1]]   &= ~left
 
-    def removeBarrierFromMap(self,barrier):
+    def remove_barrier_from_map(self,barrier):
         """Remove the barrier from the allowed moves"""
         for pos in barrier.nodes():
             if barrier.direction == right:
@@ -191,7 +191,7 @@ class Board:
                 self.moves[pos[0]-1][pos[1]] |= right
                 self.moves[pos[0]][pos[1]]   |= left
 
-    def prettyPrintASCII(self):
+    def pretty_print_ascii(self):
         """Pretty-print the board in ASCII"""
         cellsizex=6 # must be >2 and even
         cellsizey=4 # must be >2 and even

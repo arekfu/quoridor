@@ -51,7 +51,7 @@ class ServerBoard(quoboard.Board):
             for h in hs:
                 if hs.count(h) > 1: initialised=False
 
-    def movePawn(self,h,direction):
+    def move_pawn(self,h,direction):
         """Check if the proposed move is allowed for the pawn identified by
         hash h"""
 
@@ -61,7 +61,7 @@ class ServerBoard(quoboard.Board):
 
         p=pl[0]
         posnew=tuple( map(sum, zip( p.position, vdir[direction]) ) )
-        if self.isPawnPositionLegal(*posnew) and self.isMoveAllowed(p.position,direction):
+        if self.is_pawn_position_legal(*posnew) and self.is_move_allowed(p.position,direction):
             p.move(direction)
             return True
         else:
@@ -70,12 +70,12 @@ class ServerBoard(quoboard.Board):
 
 MyServerBoard=ServerBoard()
 for i in range(60):
-    MyServerBoard.addBarrier(quoboard.Barrier(
+    MyServerBoard.add_barrier(quoboard.Barrier(
         random.randint(0,MyServerBoard.side-1),
         random.randint(0,MyServerBoard.side-1),
         random.choice([up,right,down,left]),
         2))
 for i in range(60):
-    MyServerBoard.movePawn(MyServerBoard.pp[0].h,
+    MyServerBoard.move_pawn(MyServerBoard.pp[0].h,
         random.choice([up,right,down,left]))
-MyServerBoard.prettyPrintASCII()
+MyServerBoard.pretty_print_ascii()
