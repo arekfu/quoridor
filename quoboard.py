@@ -34,7 +34,9 @@ class Barrier:
     # Barrier positions are defined as being (0,0) in the top-left corner
     # of the board. Thus each coordinate ranges from 0 to side
     def __init__(self,x,y,direction,length=2):
-        if direction!=up and direction!=right and direction!=down and direction!=left : raise 'Barrier direction must be up, right, left or down'
+        if direction!=up and direction!=right and direction!=down and direction!=left:
+            logging.critical('Barrier direction must be up, right, left or down')
+            raise
         self.position=(x,y)
         self.direction=direction
         self.length=length
@@ -85,7 +87,6 @@ class Barrier:
 class Board:
     """Board class with barriers and table of allowed moves"""
     def __init__(self,side):
-        #if side%2 == 0: raise 'Board objects must have odd side length'
         self.side = side
         self.middle = self.side/2
         self.moves = [[up | down | right | left for i in range(self.side)] for j in range(self.side)]

@@ -3,13 +3,18 @@
 import quoboard
 import random
 
+
+
+# Global variables
 global up,right,down,left,vdir
 vdir = quoboard.vdir
 up = quoboard.up
 right = quoboard.right
 down = quoboard.down
 left = quoboard.left
+logging = quoboard.logging
 
+# Class definitions
 
 class Pawn:
     """Pawn class"""
@@ -32,7 +37,9 @@ class ServerBoard(quoboard.Board):
 
     def __init__(self,side=9,nplayers=4):
         """A simple constructor, performs some sanity checks"""
-        if nplayers < 2 or nplayers > 4: raise 'Barrier length must be >0 and <side length'
+        if nplayers < 2 or nplayers > 4:
+            logging.critical('Barrier length must be >0 and <side length')
+            raise
         quoboard.Board.__init__(self,side)
 
         initialised=False
@@ -61,7 +68,8 @@ class ServerBoard(quoboard.Board):
 
         pl=filter(lambda q: h==q.h, self.pp)
         if len(pl)==0:
-            raise "Hash ", h, " not recognized"
+            logging.critical("Hash %s not recognized", h)
+            raise
 
         p=pl[0]
         posnew=tuple( map(sum, zip( p.position, vdir[direction]) ) )
