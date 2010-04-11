@@ -19,7 +19,7 @@ class Pawn:
         self.h=reduce(lambda a,b:a+b, [ random.choice(alphabet) for i in range(15) ] )
 
     def move(self,direction):
-       self.position=tuple(map(sum,zip(self.position,quoboard.vdir[direction])))
+       self.position=tuple(map(sum,zip(self.position,vdir[direction])))
        return self.position
 
 class ServerBoard(quoboard.Board):
@@ -51,6 +51,21 @@ class ServerBoard(quoboard.Board):
             for h in hs:
                 if hs.count(h) > 1: initialised=False
 
+    def movePawn(self,h,direction):
+        """Check if the proposed move is allowed for the pawn identified by
+        hash h"""
+
+        pl=filter(lambda q: h==q.h, self.pp)
+        if len(pl)==0:
+            raise "Hash ", h, " not recognized"
+
+        p=pl[0]
+        posnew=tuple( map(sum, zip( p.position, vdir[direction]) ) )
+        if self.isPawnPositionLegal(*posnew) and self.isMoveAllowed(p.position,direction):
+            p.move(direction)
+            return True
+        else:
+            return False
 
 
 MyServerBoard=ServerBoard()
@@ -60,4 +75,7 @@ for i in range(60):
         random.randint(0,MyServerBoard.side-1),
         random.choice([up,right,down,left]),
         2))
+for i in range(60):
+    MyServerBoard.movePawn(MyServerBoard.pp[0].h,
+        random.choice([up,right,down,left]))
 MyServerBoard.prettyPrintASCII()

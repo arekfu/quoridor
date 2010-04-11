@@ -89,6 +89,10 @@ class Board:
         """Check if the proposed pawn position is within the board limits"""
         return ( 0 <= x < self.side and 0 <= y < self.side)
 
+    def isMoveAllowed(self,position,direction):
+        """Check if the proposed move is allowed by barriers"""
+        return ( self.moves[position[0]][position[1]] & direction )
+
     def isBarrierLegal(self,barrier):
         """Check if both ends of the proposed barrier are within the board
         limits"""
