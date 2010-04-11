@@ -85,14 +85,25 @@ class Board:
             self.moves[i][side-1] &= ~down
         self.barriers=[]
 
+    def isPawnPositionLegal(self,x,y):
+        """Check if the proposed pawn position is within the board limits"""
+        return ( 0 <= x < self.side and 0 <= y < self.side)
+
+    def isBarrierLegal(self,barrier):
+        """Check if both ends of the proposed barrier are within the board
+        limits"""
+        x,y=barrier.position
+        x2,y2=barrier.position2
+        if barrier.direction == right:
+            return ( 0 <= x <= self.side and 0 < y < self.side and 0 <= x2 <= self.side )
+        else:
+            return ( 0 < x < self.side and 0 <= y <= self.side and 0 <= y2 <= self.side )
+
     def checkBarrier(self,barrier):
         """Check if barrier is allowed"""
 
-        # Check if the barrier origin is in an allowed position
-        if barrier.position[0]<0 or barrier.position[0]>self.side or barrier.position[1]<0 or barrier.position[1]>self.side:
-            return False
-        # Check if the whole barrier is contained in the board
-        if barrier.position2[0]<0 or barrier.position2[0]>self.side or barrier.position2[1]<0 or barrier.position2[1]>self.side:
+        # Check if the barrier is allowed
+        if not self.isBarrierLegal( barrier ):
             return False
 
         # Check if new barrier overlaps with existing barriers

@@ -54,6 +54,10 @@ class ServerBoard(quoboard.Board):
 
 
 MyServerBoard=ServerBoard()
-MyServerBoard.addBarrier(quoboard.Barrier(2,3,down,2))
+for i in range(60):
+    MyServerBoard.addBarrier(quoboard.Barrier(
+        random.randint(0,MyServerBoard.side-1),
+        random.randint(0,MyServerBoard.side-1),
+        random.choice([up,right,down,left]),
+        2))
 MyServerBoard.prettyPrintASCII()
-for p in MyServerBoard.pp: print p.h
