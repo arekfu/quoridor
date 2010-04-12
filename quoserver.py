@@ -27,8 +27,8 @@ class Pawn:
         alphabet='abcdefghijklmnopqrstuvwxyz'
         self.h=reduce(lambda a,b:a+b, [ random.choice(alphabet) for i in range(15) ] )
 
-    def move(self,direction):
-       self.position=tuple(map(sum,zip(self.position,vdir[direction])))
+    def move(self,position):
+       self.position=position
        return self.position
 
 class ServerBoard(quoboard.Board):
@@ -75,7 +75,7 @@ class ServerBoard(quoboard.Board):
         p=pl[0]
         posnew=tuple( map(sum, zip( p.position, vdir[direction]) ) )
         if self.is_pawn_position_legal(*posnew) and self.is_move_allowed(p.position,direction):
-            p.move(direction)
+            p.move(posnew)
             return True
         else:
             return False
