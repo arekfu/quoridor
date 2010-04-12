@@ -20,10 +20,11 @@ logging = quoboard.logging
 class Pawn:
     """Pawn class"""
 
-    def __init__(self,x,y,symbol,goal):
+    def __init__(self,x,y,symbol,goal,ai):
         self.position=(x,y)
         self.symbol=symbol
         self.goal=goal
+        self.ai=ai
         alphabet='abcdefghijklmnopqrstuvwxyz'
         self.h=reduce(lambda a,b:a+b, [ random.choice(alphabet) for i in range(15) ] )
 
@@ -36,7 +37,7 @@ class ServerBoard(quoboard.Board):
 
     Includes methods to add barriers and update the table of allowed moves"""
 
-    def __init__(self,side=9,nplayers=4):
+    def __init__(self,side,nplayers,player_ai):
         """A simple constructor, performs some sanity checks"""
         if nplayers < 2 or nplayers > 4:
             logging.critical('Barrier length must be >0 and <side length')
@@ -45,17 +46,17 @@ class ServerBoard(quoboard.Board):
 
         initialised=False
         while(not initialised):
-            self.pp = [Pawn(self.middle, 0, '1', down)]
+            self.pp = [Pawn(self.middle, 0, '1', down, player_ai[0])]
             self.nplayers=nplayers
             if self.nplayers == 2:
-                self.pp.append(Pawn(self.middle, self.side-1, '2', up))
+                self.pp.append(Pawn(self.middle, self.side-1, '2', up, player_ai[1]))
             elif self.nplayers == 3:
-                self.pp.append(Pawn(self.side-1, self.middle, '2', left))
-                self.pp.append(Pawn(self.middle, self.side-1, '3', up))
+                self.pp.append(Pawn(self.side-1, self.middle, '2', left, player_ai[1]))
+                self.pp.append(Pawn(self.middle, self.side-1, '3', up, player_ai[2]))
             elif self.nplayers == 4:
-                self.pp.append(Pawn(self.side-1, self.middle, '2', left))
-                self.pp.append(Pawn(self.middle, self.side-1, '3', up))
-                self.pp.append(Pawn(0, self.middle, '4', right))
+                self.pp.append(Pawn(self.side-1, self.middle, '2', left, player_ai[1]))
+                self.pp.append(Pawn(self.middle, self.side-1, '3', up, player_ai[2]))
+                self.pp.append(Pawn(0, self.middle, '4', right, player_ai[3]))
             # Check that the hashes are all different
             # (usually overkill, but anyway...)
             initialised=True
@@ -86,7 +87,7 @@ class QuoServer:
 
         self.read_config()
 
-        self.serverboard=ServerBoard(self.side,self.nplayers)
+        self.serverboard=ServerBoard(self.side,self.nplayers,self.player_ai)
         if self.curses_ui:
             curses.wrapper(self.main_loop)
         else:
@@ -96,13 +97,188 @@ class QuoServer:
         """The main loop of the game."""
 
         if self.curses_ui:
-            self.curses_init()
             self.stdscr=stdscr
+            self.curses_init()
 
         while(True):
+            for i in range(self.nplayers):
+                self.pretty_print()
+                if self.check_win(i):
+                    self.win(i)
+                    return
+                if self.serverboard.pp[i].ai:
+                    while(not self.serverboard.move_pawn(self.serverboard.pp[i].h,
+                        random.choice([up,right,down,left]))):
+                        pass
+                else:
+                    moved=False
+                    while(not moved):
+                        c = self.getinput()
+                        if c == ord('q'): return
+                        elif c == curses.KEY_LEFT:
+                            moved = self.serverboard.move_pawn(self.serverboard.pp[i].h, left)
+                        elif c == curses.KEY_RIGHT:
+                            moved = self.serverboard.move_pawn(self.serverboard.pp[i].h, right)
+                        elif c == curses.KEY_UP:
+                            moved = self.serverboard.move_pawn(self.serverboard.pp[i].h, up)
+                        elif c == curses.KEY_DOWN:
+                            moved = self.serverboard.move_pawn(self.serverboard.pp[i].h, down)
+                        elif c == ord('b'):
+                            moved = self.choose_barrier()
+                        if not moved: curses.flash()
+
+    def choose_barrier(self):
+        """Choose where to put the barrier on the map."""
+
+        # First choose the barrier position
+        pos_curs=[self.serverboard.middle,self.serverboard.middle]
+        chosen_position=False
+        while not chosen_position:
+            oldp=pos_curs[:]
+
+            x = self.ox + pos_curs[0]*self.cellsizex
+            y = self.oy + pos_curs[1]*self.cellsizey
+            oldc=self.stdscr.inch(y,x)
+            logging.info('oldc: %d',oldc)
+            self.stdscr.addch(y,x,ord('X'), curses.color_pair(4) | curses.A_REVERSE )
+            self.stdscr.refresh()
+
             c = self.getinput()
-            if c == ord('q'): break
-            if c == ord('d'): self.demo()
+            if c == ord('q'):
+                x = self.ox + oldp[0]*self.cellsizex
+                y = self.oy + oldp[1]*self.cellsizey
+                self.stdscr.addch(y,x,ord(' '), curses.color_pair(4) )
+                return False
+            elif c == curses.KEY_LEFT:
+                pos_curs[0]=max(0,pos_curs[0]-1)
+            elif c == curses.KEY_RIGHT:
+                pos_curs[0]=min(self.side,pos_curs[0]+1)
+            elif c == curses.KEY_UP:
+                pos_curs[1]=max(0,pos_curs[1]-1)
+            elif c == curses.KEY_DOWN:
+                pos_curs[1]=min(self.side,pos_curs[1]+1)
+            elif c == ord('b') or c == curses.KEY_ENTER:
+                chosen_position=True
+
+            x = self.ox + oldp[0]*self.cellsizex
+            y = self.oy + oldp[1]*self.cellsizey
+            self.stdscr.addch(y, x, oldc & 255, oldc ^ (oldc & 255) )
+
+        # Now choose the barrier orientation
+        length=2
+        if pos_curs[0]<self.side-length+1:
+            direction=right
+        else:
+            direction=left
+        chosen_direction=False
+
+        while not chosen_direction:
+            oldd=direction
+            oldc=[]
+
+            x = self.ox + pos_curs[0]*self.cellsizex
+            y = self.oy + pos_curs[1]*self.cellsizey
+            if direction == right:
+                for i in range(1,length*self.cellsizex):
+                    x += 1
+                    oldc.append(self.stdscr.inch(y,x))
+                    self.stdscr.addch(y,x,ord('X'), curses.color_pair(4) | curses.A_REVERSE )
+            elif direction == down:
+                for i in range(1,length*self.cellsizey):
+                    y += 1
+                    oldc.append(self.stdscr.inch(y,x))
+                    self.stdscr.addch(y,x,ord('X'), curses.color_pair(4) | curses.A_REVERSE )
+            elif direction == left:
+                for i in range(1,length*self.cellsizex):
+                    x -= 1
+                    oldc.append(self.stdscr.inch(y,x))
+                    self.stdscr.addch(y,x,ord('X'), curses.color_pair(4) | curses.A_REVERSE )
+            elif direction == up:
+                for i in range(1,length*self.cellsizey):
+                    y -= 1
+                    oldc.append(self.stdscr.inch(y,x))
+                    self.stdscr.addch(y,x,ord('X'), curses.color_pair(4) | curses.A_REVERSE )
+            self.stdscr.refresh()
+
+            c = self.getinput()
+            if c == ord('q'):
+                x = self.ox + pos_curs[0]*self.cellsizex
+                y = self.oy + pos_curs[1]*self.cellsizey
+                if direction == right:
+                    for i in range(1,length*self.cellsizex):
+                        x += 1
+                        self.stdscr.addch(y,x,oldc.pop(0), curses.color_pair(4) )
+                elif direction == down:
+                    for i in range(1,length*self.cellsizey):
+                        y += 1
+                        self.stdscr.addch(y,x,oldc.pop(0), curses.color_pair(4) )
+                elif direction == left:
+                    for i in range(1,length*self.cellsizex):
+                        x -= 1
+                        self.stdscr.addch(y,x,oldc.pop(0), curses.color_pair(4) )
+                elif direction == up:
+                    for i in range(1,length*self.cellsizey):
+                        y -= 1
+                        self.stdscr.addch(y,x,oldc.pop(0), curses.color_pair(4) )
+                self.stdscr.refresh()
+
+                return False
+            elif c == curses.KEY_LEFT:
+                if pos_curs[0]>=length:
+                    direction=left
+                else:
+                    curses.flash()
+            elif c == curses.KEY_RIGHT:
+                if pos_curs[0]<=self.side-length:
+                    direction=right
+                else:
+                    curses.flash()
+            elif c == curses.KEY_UP:
+                if pos_curs[1]>=length:
+                    direction=up
+                else:
+                    curses.flash()
+            elif c == curses.KEY_DOWN:
+                if pos_curs[1]<=self.side-length:
+                    direction=down
+                else:
+                    curses.flash()
+            elif c == ord('b') or c == curses.KEY_ENTER:
+                chosen_direction=True
+
+            x = self.ox + pos_curs[0]*self.cellsizex
+            y = self.oy + pos_curs[1]*self.cellsizey
+            if oldd == right:
+                for i in range(1,length*self.cellsizex):
+                    x += 1
+                    occ = oldc.pop(0)
+                    self.stdscr.addch(y,x, occ & 255 , occ ^ (occ & 255) )
+            elif oldd == down:
+                for i in range(1,length*self.cellsizey):
+                    y += 1
+                    occ = oldc.pop(0)
+                    self.stdscr.addch(y,x, occ & 255 , occ ^ (occ & 255) )
+            elif oldd == left:
+                for i in range(1,length*self.cellsizex):
+                    x -= 1
+                    occ = oldc.pop(0)
+                    self.stdscr.addch(y,x, occ & 255 , occ ^ (occ & 255) )
+            elif oldd == up:
+                for i in range(1,length*self.cellsizey):
+                    y -= 1
+                    occ = oldc.pop(0)
+                    self.stdscr.addch(y,x, occ & 255 , occ ^ (occ & 255) )
+
+        return self.serverboard.add_barrier(quoboard.Barrier(
+            pos_curs[0],pos_curs[1],direction,length))
+
+
+
+    def check_win(self,i):
+        pass
+
+    def win(self,i):
+        pass
 
     def getinput(self):
         """Get input from the user."""
@@ -133,6 +309,8 @@ class QuoServer:
         curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
+        curses.init_pair(4, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        self.stdscr.border()
 
     def read_config(self):
         """Read the configuration file using the ConfigParser module"""
@@ -157,6 +335,7 @@ class QuoServer:
 
         self.side = config.getint('Board','side')
         self.nplayers = config.getint('Game','nplayers')
+        self.player_ai = [ config.getboolean('Game','player'+str(i)+'_ai') for i in range(1,self.nplayers+1) ]
         self.curses_ui = config.getboolean('UI','curses_ui')
         self.cellsizex = max(2,(config.getint('UI','cellsizex')/2)*2)
         self.cellsizey = max(2,(config.getint('UI','cellsizey')/2)*2)
@@ -176,7 +355,11 @@ class QuoServer:
             'side':         9
         }
         opt_game = {
-            'nplayers':     4
+            'nplayers':     4,
+            'player1_ai':   'off',
+            'player2_ai':   'off',
+            'player3_ai':   'off',
+            'player4_ai':   'off'
         }
         opt_ui = {
             'curses_ui':     'on',
@@ -206,12 +389,16 @@ class QuoServer:
         config.write(f)
         f.close()
 
-    def pretty_print_curses(self,ox=0,oy=0):
+    def pretty_print_curses(self):
         """Pretty-print the board using curses"""
         side=self.side
         cellsizex=self.cellsizex
         cellsizey=self.cellsizey
         scr=self.stdscr
+        self.ox=5
+        self.oy=5
+        ox=self.ox
+        oy=self.oy
         # Horizontal lines
 #        for y in range(0,cellsizey*side,cellsizey):
 #            scr.addstr(oy+y,ox, side * (' ' + (cellsizex-1)*' ') + ' ',
@@ -276,11 +463,13 @@ class QuoServer:
         # Do the drawing
         scr.refresh()
 
-    def pretty_print_ascii(self,ox=0,oy=0):
+    def pretty_print_ascii(self):
         """Pretty-print the board in ASCII"""
         side=self.side
         cellsizex=self.cellsizex
         cellsizey=self.cellsizey
+        ox=0
+        oy=0
 
         image=[(cellsizex*side+1)*' ' for y in range(cellsizey*side+1)]
 
