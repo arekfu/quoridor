@@ -103,9 +103,6 @@ class QuoServer:
         while(True):
             for i in range(self.nplayers):
                 self.pretty_print()
-                if self.check_win(i):
-                    self.win(i)
-                    return
                 if self.serverboard.pp[i].ai:
                     while(not self.serverboard.move_pawn(self.serverboard.pp[i].h,
                         random.choice([up,right,down,left]))):
@@ -126,6 +123,9 @@ class QuoServer:
                         elif c == ord('b'):
                             moved = self.choose_barrier()
                         if not moved: curses.flash()
+                if self.check_win(i):
+                    self.win(i)
+                    return
 
     def choose_barrier(self):
         """Choose where to put the barrier on the map."""
@@ -275,10 +275,20 @@ class QuoServer:
 
 
     def check_win(self,i):
+        p = self.serverboard.pp[i]
+        if (p.goal == up and p.position[1] == 0) or \
+            (p.goal == right and p.position[0] == self.side-1) or \
+            (p.goal == down and p.position[1] == self.side-1) or \
+            (p.goal == left and p.position[0] == 0):
+               return True
+        else:
+            return False
         pass
 
     def win(self,i):
-        pass
+        self.stdscr.addstr(0,0,'Player '+str(i+1)+' wins!')
+        self.stdscr.refresh()
+        time.sleep(3)
 
     def getinput(self):
         """Get input from the user."""
