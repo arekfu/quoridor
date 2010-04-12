@@ -12,14 +12,13 @@ logging.basicConfig(level=logging.DEBUG,
 
 
 # Global variables
-global up, right, down, left, visited
+global up, right, down, left
 global vdir
 
 up=1
 right=2
 down=4
 left=8
-visited=16  # used in Board.closedOffPawns()
 vdir={
                 up:     (0,-1),
                 right:  (1,0),
@@ -144,6 +143,7 @@ class Board:
     def can_win(self,p,g):
         """Recursive function to determine if position p is connected with the
         g side of the board"""
+        visited = 16
         if g == up:
             if p[1]==0: return True
         elif g == right:
