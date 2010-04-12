@@ -84,24 +84,28 @@ class QuoServer:
 
     def __init__(self,stdscr):
         self.stdscr=stdscr
+        self.curses_init()
+        self.read_config()
+
+        self.serverboard=ServerBoard(self.side,self.nplayers)
+        for i in range(25):
+            for j in range(4):
+                if not self.serverboard.add_barrier(quoboard.Barrier(
+                    random.randint(0,self.serverboard.side-1),
+                    random.randint(0,self.serverboard.side-1),
+                    random.choice([up,right,down,left]),
+                    2)):
+                    while(not self.serverboard.move_pawn(self.serverboard.pp[j].h,
+                        random.choice([up,right,down,left]))):
+                        pass
+                self.pretty_print(5,5)
+                time.sleep(1)
+
+    def curses_init(self):
         curses.curs_set(0)
         curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
-        self.read_config()
-
-        self.serverboard=ServerBoard(self.side,self.nplayers)
-        for i in range(60):
-            self.serverboard.add_barrier(quoboard.Barrier(
-                random.randint(0,self.serverboard.side-1),
-                random.randint(0,self.serverboard.side-1),
-                random.choice([up,right,down,left]),
-                2))
-        for i in range(60):
-            self.serverboard.move_pawn(self.serverboard.pp[0].h,
-                random.choice([up,right,down,left]))
-        self.pretty_print_curses(self.stdscr,5,5)
-        time.sleep(30)
 
     def read_config(self):
         """Read the configuration file using the ConfigParser module"""
@@ -125,7 +129,15 @@ class QuoServer:
         f.close()
 
         self.side = config.getint('Board','side')
-        self.nplayers = config.getint('Server','nplayers')
+        self.nplayers = config.getint('Game','nplayers')
+        self.curses_ui = config.getboolean('UI','curses_ui')
+        self.cellsizex = max(2,(config.getint('UI','cellsizex')/2)*2)
+        self.cellsizey = max(2,(config.getint('UI','cellsizey')/2)*2)
+        if self.curses_ui and curses.has_colors():
+            self.pretty_print=self.pretty_print_curses
+        else:
+            self.pretty_print=self.pretty_print_ascii
+            self.curses_ui=False
 
     def create_default_config(self,cfgfilename):
         """Create a config file with default option values"""
@@ -136,18 +148,27 @@ class QuoServer:
         opt_board = {
             'side':         9
         }
-        opt_server = {
+        opt_game = {
             'nplayers':     4
         }
+        opt_ui = {
+            'curses_ui':     'on',
+            'cellsizex':     6,
+            'cellsizey':     4
+        }
 
-        config.add_section('Server')
+        config.add_section('UI')
+        config.add_section('Game')
         config.add_section('Board')
 
         for opt, val in opt_board.items():
             config.set('Board', opt, val)
 
-        for opt, val in opt_server.items():
-            config.set('Server', opt, val)
+        for opt, val in opt_game.items():
+            config.set('Game', opt, val)
+
+        for opt, val in opt_ui.items():
+            config.set('UI', opt, val)
 
         try:
             f=open(cfgfilename,'w')
@@ -158,10 +179,12 @@ class QuoServer:
         config.write(f)
         f.close()
 
-    def pretty_print_curses(self,scr,ox=0,oy=0,cellsizex=6,cellsizey=4):
+    def pretty_print_curses(self,ox=0,oy=0):
         """Pretty-print the board using curses"""
         side=self.side
-
+        cellsizex=self.cellsizex
+        cellsizey=self.cellsizey
+        scr=self.stdscr
         # Horizontal lines
 #        for y in range(0,cellsizey*side,cellsizey):
 #            scr.addstr(oy+y,ox, side * (' ' + (cellsizex-1)*' ') + ' ',
@@ -226,9 +249,12 @@ class QuoServer:
         # Do the drawing
         scr.refresh()
 
-    def pretty_print_ascii(self,cellsizex=6,cellsizey=4):
+    def pretty_print_ascii(self,ox=0,oy=0):
         """Pretty-print the board in ASCII"""
         side=self.side
+        cellsizex=self.cellsizex
+        cellsizey=self.cellsizey
+
         image=[(cellsizex*side+1)*' ' for y in range(cellsizey*side+1)]
 
         # Horizontal lines
