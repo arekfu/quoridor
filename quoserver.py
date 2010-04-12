@@ -82,12 +82,38 @@ class ServerBoard(quoboard.Board):
 
 class QuoServer:
 
-    def __init__(self,stdscr):
-        self.stdscr=stdscr
-        self.curses_init()
+    def __init__(self):
+
         self.read_config()
 
         self.serverboard=ServerBoard(self.side,self.nplayers)
+        if self.curses_ui:
+            curses.wrapper(self.main_loop)
+        else:
+            self.main_loop(None)
+
+    def main_loop(self,stdscr):
+        """The main loop of the game."""
+
+        if self.curses_ui:
+            self.curses_init()
+            self.stdscr=stdscr
+
+        while(True):
+            c = self.getinput()
+            if c == ord('q'): break
+            if c == ord('d'): self.demo()
+
+    def getinput(self):
+        """Get input from the user."""
+        if self.curses_ui:
+            return self.stdscr.getch()
+        else:
+            logging.critical('Input in ASCII mode: to be implemented')
+            raise 
+
+    def demo(self):
+        """Demo mode"""
         for i in range(25):
             for j in range(4):
                 if not self.serverboard.add_barrier(quoboard.Barrier(
@@ -102,6 +128,7 @@ class QuoServer:
                 time.sleep(1)
 
     def curses_init(self):
+        """Initialises the curses system."""
         curses.curs_set(0)
         curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
@@ -133,7 +160,7 @@ class QuoServer:
         self.curses_ui = config.getboolean('UI','curses_ui')
         self.cellsizex = max(2,(config.getint('UI','cellsizex')/2)*2)
         self.cellsizey = max(2,(config.getint('UI','cellsizey')/2)*2)
-        if self.curses_ui and curses.has_colors():
+        if self.curses_ui:
             self.pretty_print=self.pretty_print_curses
         else:
             self.pretty_print=self.pretty_print_ascii
@@ -312,8 +339,5 @@ class QuoServer:
         # Do the drawing
         for line in image: print line
 
-def main(stdscr):
-    my_quoridor_server=QuoServer(stdscr)
-
-curses.wrapper(main)
+my_quoridor_server=QuoServer()
 
