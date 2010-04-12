@@ -5,7 +5,7 @@ import pdb
 
 # Set up logging
 import logging
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.CRITICAL,
         format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt='%a, %d %b %Y %H:%M:%S')
 
@@ -202,66 +202,4 @@ class Board:
             else:
                 self.moves[pos[0]-1][pos[1]] |= right
                 self.moves[pos[0]][pos[1]]   |= left
-
-    def pretty_print_ascii(self):
-        """Pretty-print the board in ASCII"""
-        cellsizex=6 # must be >2 and even
-        cellsizey=4 # must be >2 and even
-        side=self.side
-        image=[(cellsizex*side+1)*' ' for y in range(cellsizey*side+1)]
-
-        # Horizontal lines
-        for y in range(0,cellsizey*side,cellsizey):
-            image[y] = side * ('+' + (cellsizex-1)*'-') + '+'
-        image[cellsizey*side] = side * ('+' + (cellsizex-1)*'-') + '+'
-
-        # Vertical lines
-        for y in range(cellsizey*side+1):
-            if y%cellsizey==0: continue
-            for x in range(cellsizex,cellsizex*(side+1),cellsizex):
-                image[y]=image[y][:x]+'|'+image[y][x+1:]
-                image[y]='|'+image[y][1:]
-
-        # Pawns
-        for p in self.pp:
-            x = cellsizex / 2 + p.position[0]*cellsizex
-            y = cellsizey / 2 + p.position[1]*cellsizey
-            image[y] = image[y][:x] + p.symbol + image[y][x+1:]
-
-        # Barriers
-        for b in self.barriers:
-            p=b.node(0)
-            x = p[0]*cellsizex
-            y = p[1]*cellsizey
-            if b.direction == right:
-                for i in range(1,b.length*cellsizex):
-                    x += 1
-                    image[y] = image[y][:x] + 'X' + image[y][x+1:]
-            else:
-                for i in range(1,b.length*cellsizey):
-                    y += 1
-                    image[y] = image[y][:x] + 'X' + image[y][x+1:]
-
-        # Arrows
-        for x in range(self.side):
-            for y in range(self.side):
-                if self.moves[x][y] & up:
-                    xa = cellsizex / 2 + x*cellsizex
-                    ya = cellsizey / 2 + y*cellsizey - 1
-                    image[ya] = image[ya][:xa] + '^' + image[ya][xa+1:]
-                if self.moves[x][y] & right:
-                    xa = cellsizex / 2 + x*cellsizex + 1
-                    ya = cellsizey / 2 + y*cellsizey
-                    image[ya] = image[ya][:xa] + '>' + image[ya][xa+1:]
-                if self.moves[x][y] & down:
-                    xa = cellsizex / 2 + x*cellsizex
-                    ya = cellsizey / 2 + y*cellsizey + 1
-                    image[ya] = image[ya][:xa] + 'v' + image[ya][xa+1:]
-                if self.moves[x][y] & left:
-                    xa = cellsizex / 2 + x*cellsizex - 1
-                    ya = cellsizey / 2 + y*cellsizey
-                    image[ya] = image[ya][:xa] + '<' + image[ya][xa+1:]
-
-        # Do the drawing
-        for line in image: print line
 

@@ -2,7 +2,8 @@
 
 import quoboard
 import random
-
+import curses.wrapper
+import time
 
 
 # Global variables
@@ -81,10 +82,15 @@ class ServerBoard(quoboard.Board):
 
 class QuoServer:
 
-    def __init__(self):
+    def __init__(self,stdscr):
+        self.stdscr=stdscr
+        curses.curs_set(0)
+        curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
         self.read_config()
 
-        self.serverboard=ServerBoard()
+        self.serverboard=ServerBoard(self.side,self.nplayers)
         for i in range(60):
             self.serverboard.add_barrier(quoboard.Barrier(
                 random.randint(0,self.serverboard.side-1),
@@ -94,7 +100,8 @@ class QuoServer:
         for i in range(60):
             self.serverboard.move_pawn(self.serverboard.pp[0].h,
                 random.choice([up,right,down,left]))
-        self.serverboard.pretty_print_ascii()
+        self.pretty_print_curses(self.stdscr,5,5)
+        time.sleep(30)
 
     def read_config(self):
         """Read the configuration file using the ConfigParser module"""
@@ -114,22 +121,33 @@ class QuoServer:
                 raise
 
         config = ConfigParser.RawConfigParser()
-        config.read(f)
+        config.readfp(f)
         f.close()
+
+        self.side = config.getint('Board','side')
+        self.nplayers = config.getint('Server','nplayers')
 
     def create_default_config(self,cfgfilename):
         """Create a config file with default option values"""
         import ConfigParser
         config = ConfigParser.RawConfigParser()
 
-        # Dictionary of default options and values
-        opt_dic = {
-            'dummy':    0
+        # Dictionaries of default options and values
+        opt_board = {
+            'side':         9
+        }
+        opt_server = {
+            'nplayers':     4
         }
 
-        config.add_section('Main')
-        for opt, val in opt_dic.items():
-            config.set('Main', opt, val)
+        config.add_section('Server')
+        config.add_section('Board')
+
+        for opt, val in opt_board.items():
+            config.set('Board', opt, val)
+
+        for opt, val in opt_server.items():
+            config.set('Server', opt, val)
 
         try:
             f=open(cfgfilename,'w')
@@ -140,5 +158,136 @@ class QuoServer:
         config.write(f)
         f.close()
 
+    def pretty_print_curses(self,scr,ox=0,oy=0,cellsizex=6,cellsizey=4):
+        """Pretty-print the board using curses"""
+        side=self.side
 
-my_quoridor_server=QuoServer()
+        # Horizontal lines
+#        for y in range(0,cellsizey*side,cellsizey):
+#            scr.addstr(oy+y,ox, side * (' ' + (cellsizex-1)*' ') + ' ',
+#                curses.color_pair(1) | curses.A_REVERSE )
+#        scr.addstr(oy+cellsizey*side,ox,side * (' ' + (cellsizex-1)*' ') + ' ',
+#            curses.color_pair(1) | curses.A_REVERSE )
+
+        # Vertical lines
+#        for y in range(cellsizey*side+1):
+#            if y%cellsizey==0: continue
+#            for x in range(cellsizex,cellsizex*(side+1),cellsizex):
+#                scr.addstr(oy+y,ox+x,' ', curses.color_pair(1) | curses.A_REVERSE )
+#                scr.addstr(oy+y,ox,' ', curses.color_pair(1) | curses.A_REVERSE )
+
+        # Squares
+        for y in range(cellsizey*side+1):
+            if y%cellsizey==0: continue
+            for x in range(1,cellsizex*side+1,cellsizex):
+                scr.addstr(oy+y,ox+x, (cellsizex-1)*' ',
+                    curses.color_pair(1) | curses.A_REVERSE )
+
+        # Pawns
+        for p in self.serverboard.pp:
+            x = cellsizex / 2 + p.position[0]*cellsizex
+            y = cellsizey / 2 + p.position[1]*cellsizey
+            scr.addstr(oy+y,ox+x,p.symbol, curses.color_pair(3) )
+
+        # Barriers
+        for b in self.serverboard.barriers:
+            p=b.node(0)
+            x = p[0]*cellsizex
+            y = p[1]*cellsizey
+            if b.direction == right:
+                for i in range(1,b.length*cellsizex):
+                    x += 1
+                    scr.addstr(oy+y,ox+x,'X', curses.color_pair(2) | curses.A_REVERSE )
+            else:
+                for i in range(1,b.length*cellsizey):
+                    y += 1
+                    scr.addstr(oy+y,ox+x,'X', curses.color_pair(2) | curses.A_REVERSE )
+
+        # Arrows
+        for x in range(self.side):
+            for y in range(self.side):
+                if self.serverboard.moves[x][y] & up:
+                    xa = cellsizex / 2 + x*cellsizex
+                    ya = cellsizey / 2 + y*cellsizey - 1
+                    scr.addstr(oy+ya,ox+xa,'^', curses.color_pair(1) | curses.A_REVERSE )
+                if self.serverboard.moves[x][y] & right:
+                    xa = cellsizex / 2 + x*cellsizex + 1
+                    ya = cellsizey / 2 + y*cellsizey
+                    scr.addstr(oy+ya,ox+xa,'>', curses.color_pair(1) | curses.A_REVERSE )
+                if self.serverboard.moves[x][y] & down:
+                    xa = cellsizex / 2 + x*cellsizex
+                    ya = cellsizey / 2 + y*cellsizey + 1
+                    scr.addstr(oy+ya,ox+xa,'v', curses.color_pair(1) | curses.A_REVERSE )
+                if self.serverboard.moves[x][y] & left:
+                    xa = cellsizex / 2 + x*cellsizex - 1
+                    ya = cellsizey / 2 + y*cellsizey
+                    scr.addstr(oy+ya,ox+xa,'<', curses.color_pair(1) | curses.A_REVERSE )
+
+        # Do the drawing
+        scr.refresh()
+
+    def pretty_print_ascii(self,cellsizex=6,cellsizey=4):
+        """Pretty-print the board in ASCII"""
+        side=self.side
+        image=[(cellsizex*side+1)*' ' for y in range(cellsizey*side+1)]
+
+        # Horizontal lines
+        for y in range(0,cellsizey*side,cellsizey):
+            image[y] = side * ('+' + (cellsizex-1)*'-') + '+'
+        image[cellsizey*side] = side * ('+' + (cellsizex-1)*'-') + '+'
+
+        # Vertical lines
+        for y in range(cellsizey*side+1):
+            if y%cellsizey==0: continue
+            for x in range(cellsizex,cellsizex*(side+1),cellsizex):
+                image[y]=image[y][:x]+'|'+image[y][x+1:]
+                image[y]='|'+image[y][1:]
+
+        # Pawns
+        for p in self.serverboard.pp:
+            x = cellsizex / 2 + p.position[0]*cellsizex
+            y = cellsizey / 2 + p.position[1]*cellsizey
+            image[y] = image[y][:x] + p.symbol + image[y][x+1:]
+
+        # Barriers
+        for b in self.serverboard.barriers:
+            p=b.node(0)
+            x = p[0]*cellsizex
+            y = p[1]*cellsizey
+            if b.direction == right:
+                for i in range(1,b.length*cellsizex):
+                    x += 1
+                    image[y] = image[y][:x] + 'X' + image[y][x+1:]
+            else:
+                for i in range(1,b.length*cellsizey):
+                    y += 1
+                    image[y] = image[y][:x] + 'X' + image[y][x+1:]
+
+        # Arrows
+        for x in range(self.side):
+            for y in range(self.side):
+                if self.serverboard.moves[x][y] & up:
+                    xa = cellsizex / 2 + x*cellsizex
+                    ya = cellsizey / 2 + y*cellsizey - 1
+                    image[ya] = image[ya][:xa] + '^' + image[ya][xa+1:]
+                if self.serverboard.moves[x][y] & right:
+                    xa = cellsizex / 2 + x*cellsizex + 1
+                    ya = cellsizey / 2 + y*cellsizey
+                    image[ya] = image[ya][:xa] + '>' + image[ya][xa+1:]
+                if self.serverboard.moves[x][y] & down:
+                    xa = cellsizex / 2 + x*cellsizex
+                    ya = cellsizey / 2 + y*cellsizey + 1
+                    image[ya] = image[ya][:xa] + 'v' + image[ya][xa+1:]
+                if self.serverboard.moves[x][y] & left:
+                    xa = cellsizex / 2 + x*cellsizex - 1
+                    ya = cellsizey / 2 + y*cellsizey
+                    image[ya] = image[ya][:xa] + '<' + image[ya][xa+1:]
+
+        # Do the drawing
+        for line in image: print line
+
+def main(stdscr):
+    my_quoridor_server=QuoServer(stdscr)
+
+curses.wrapper(main)
+
