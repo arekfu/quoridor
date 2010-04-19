@@ -135,7 +135,7 @@ class QuoServer:
 
             c = self.ui.get_input()
             if c == self.ui.inp.quit:
-                self.ui.delete_old_barrier_cursor()
+                self.ui.delete_old_barrier_cursor(True)
                 return False
             elif c == self.ui.inp.left:
                 pos_curs[0]=max(0,pos_curs[0]-1)
@@ -148,7 +148,7 @@ class QuoServer:
             elif c == self.ui.inp.barrier:
                 chosen_position=True
 
-        self.ui.delete_old_barrier_cursor()
+        self.ui.delete_old_barrier_cursor(False)
         # Now choose the barrier orientation
         length=2
         if pos_curs[0]<self.side-length+1:
@@ -162,7 +162,7 @@ class QuoServer:
 
             c = self.ui.get_input()
             if c == self.ui.inp.quit:
-                self.ui.delete_old_barrier()
+                self.ui.delete_old_barrier(True)
                 return False
             elif c == self.ui.inp.left:
                 if pos_curs[0]>=length:
@@ -187,11 +187,10 @@ class QuoServer:
             elif c == self.ui.inp.barrier:
                 chosen_direction=True
 
-        self.ui.delete_old_barrier()
-        return self.serverboard.add_barrier(quoboard.Barrier(
+        result= self.serverboard.add_barrier(quoboard.Barrier(
             pos_curs[0],pos_curs[1],direction,length))
-
-
+        self.ui.delete_old_barrier(not result)
+        return result
 
     def check_win(self,i):
         p = self.serverboard.pp[i]
@@ -205,9 +204,7 @@ class QuoServer:
         pass
 
     def win(self,i):
-        self.stdscr.addstr(0,0,'Player '+str(i+1)+' wins!')
-        self.stdscr.refresh()
-        time.sleep(3)
+        pass
 
     def demo(self):
         """Demo mode"""
