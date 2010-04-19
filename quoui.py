@@ -13,8 +13,9 @@ def sigwinch_handler(n,frame):
     curses.endwin()
     curses.initscr()
     the_ui.update_win_size()
-
-
+    the_ui.scr.erase()
+    the_ui.scr.border()
+    the_ui.server.update_screen()
 
 
 
@@ -22,13 +23,14 @@ def sigwinch_handler(n,frame):
 class ui_curses:
     """User interface using curses."""
 
-    def __init__(self,side,cx,cy,npl):
+    def __init__(self,side,cx,cy,npl,server):
         global the_ui
         self.side=side
         self.cellsizex=cx
         self.cellsizey=cy
         self.nplayers=npl
-        the_ui=self
+        self.server=server
+        the_ui = self
 
         # Set up the SIGWINCH handler
         signal.signal(signal.SIGWINCH,sigwinch_handler)

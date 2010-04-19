@@ -77,10 +77,13 @@ class QuoServer:
 
     def __init__(self):
 
+        global the_server
+
         self.read_config()
 
         self.serverboard=ServerBoard(self.side,self.nplayers,self.player_ai)
-        self.ui = quoui.ui_curses(self.side,self.cellsizex,self.cellsizey,self.nplayers)
+        self.ui = quoui.ui_curses(self.side,self.cellsizex,self.cellsizey,self.nplayers,self)
+
         curses.wrapper(self.main_loop)
 
     def main_loop(self,scr):
@@ -90,8 +93,7 @@ class QuoServer:
 
         while(True):
             for i in range(self.nplayers):
-                self.ui.draw_board(self.serverboard.pp, self.serverboard.barriers)
-                self.ui.draw_panel()
+                self.update_screen()
                 if self.serverboard.pp[i].ai:
                     while(not self.serverboard.move_pawn(self.serverboard.pp[i].h,
                         random.choice([up,right,down,left]))):
@@ -115,6 +117,11 @@ class QuoServer:
                 if self.check_win(i):
                     self.win(i)
                     return
+
+    def update_screen(self):
+        """Call all the methods that update the screen graphics."""
+        self.ui.draw_board(self.serverboard.pp, self.serverboard.barriers)
+        self.ui.draw_panel()
 
     def choose_barrier(self):
         """Choose where to put the barrier on the map."""
