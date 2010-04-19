@@ -9,7 +9,7 @@ from quoboard import up, right, down, left, vdir, logging
 def sigwinch_handler(n,frame):
     """Signal handler for terminal resize events."""
     global the_ui
-    logging.info('SIGWINCH event, refreshing curses layer')
+    logging.debug('SIGWINCH event, refreshing curses layer')
     curses.endwin()
     curses.initscr()
     the_ui.update_win_size()
@@ -41,6 +41,9 @@ class ui_curses:
         self.panelw_ox, self.panelw_oy = self.boardw_ox + self.boardw_wid, 1
         self.board_win = self.scr.subwin(self.boardw_hei, self.boardw_wid, self.boardw_oy, self.boardw_ox)
         self.panel_win = self.scr.subwin(self.panelw_hei, self.panelw_wid, self.panelw_oy, self.panelw_ox)
+        logging.debug('ui_curses.update_win_size: scr_wid, scr_hei = %d x %d', self.scr_wid, self.scr_hei)
+        logging.debug('                           boardw_wid, boardw_hei = %d x %d', self.boardw_wid, self.boardw_hei)
+        logging.debug('                           panelw_wid, panelw_hei = %d x %d', self.panelw_wid, self.panelw_hei)
 
     def do_init(self,scr):
         """Initialises the curses system."""
