@@ -5,10 +5,15 @@ import curses, curses.wrapper, signal
 from quoboard import up, right, down, left, vdir, logging
 
 
+
 def sigwinch_handler(n,frame):
     """Signal handler for terminal resize events."""
+    global the_ui
+    logging.info('SIGWINCH event, refreshing curses layer')
     curses.endwin()
     curses.initscr()
+    the_ui.update_win_size()
+
 
 
 
@@ -18,10 +23,13 @@ class ui_curses:
     """User interface using curses."""
 
     def __init__(self,side,cx,cy,npl):
+        global the_ui
         self.side=side
         self.cellsizex=cx
         self.cellsizey=cy
         self.nplayers=npl
+        the_ui=self
+
         # Set up the SIGWINCH handler
         signal.signal(signal.SIGWINCH,sigwinch_handler)
 
