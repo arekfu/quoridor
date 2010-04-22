@@ -67,11 +67,32 @@ class ServerBoard(quoboard.Board):
 
         p=pl[0]
         posnew=tuple( map(sum, zip( p.position, vdir[direction]) ) )
-        if self.is_pawn_position_legal(*posnew) and self.is_move_allowed(p.position,direction):
+
+        # Check if pawn can go there
+        if not self.is_pawn_position_legal(*posnew) or not self.is_move_allowed(p.position,direction):
+            return False
+
+        # Jumping over another pawn?
+        if any( [ posnew == self.pp[i].position for i in range(self.nplayers) if self.pp[i].h != h ] ):
+            posnew2=tuple( map(sum, zip( posnew, vdir[direction]) ) )
+            # Check if pawn can go there
+            if not self.is_pawn_position_legal(*posnew2):
+                return False
+            elif not self.is_move_allowed(posnew,direction):
+                # Here we should implement the "bounce move", i.e. jump off a
+                # wall and land next to the other pawn. For the moment the move
+                # is just forbidden.
+                return False
+            # Do not jump two pawns in a row
+            if any( [ posnew2 == self.pp[i].position for i in range(self.nplayers) if self.pp[i].h != h ] ):
+                return False
+
+            p.move(posnew2)
+            return True
+
+        else:   # Not jumping over other pawns
             p.move(posnew)
             return True
-        else:
-            return False
 
 class QuoServer:
 
@@ -114,7 +135,9 @@ class QuoServer:
                             moved = self.serverboard.move_pawn(self.serverboard.pp[i].h, down)
                         elif c == self.ui.inp.barrier:
                             moved = self.choose_barrier()
-                        if not moved: self.ui.warn()
+                        if not moved:
+                            self.ui.communicate("Illegal move, P" + self.serverboard.pp[i].symbol + "!\n")
+                            self.ui.warn()
                 if self.check_win(i):
                     self.win(i)
                     return
