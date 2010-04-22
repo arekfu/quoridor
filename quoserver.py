@@ -93,7 +93,8 @@ class QuoServer:
 
         while(True):
             for i in range(self.nplayers):
-                self.update_screen()
+                self.ui.draw_board(self.serverboard.pp, self.serverboard.barriers)
+                self.ui.draw_players_win(self.serverboard.pp, self.serverboard.pp[i].h)
                 if self.serverboard.pp[i].ai:
                     while(not self.serverboard.move_pawn(self.serverboard.pp[i].h,
                         random.choice([up,right,down,left]))):
@@ -121,7 +122,8 @@ class QuoServer:
     def update_screen(self):
         """Call all the methods that update the screen graphics."""
         self.ui.draw_board(self.serverboard.pp, self.serverboard.barriers)
-        self.ui.draw_panel()
+        self.ui.clear_panel()
+        self.ui.clear_players_win()
 
     def choose_barrier(self):
         """Choose where to put the barrier on the map."""

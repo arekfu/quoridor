@@ -46,10 +46,12 @@ class ui_curses:
 
     def update_win_size(self):
         self.scr_hei, self.scr_wid = self.scr.getmaxyx()
-        self.boardw_wid, self.boardw_hei = 2 * (self.scr_wid - 2) / 3, self.scr_hei - 2
-        self.panelw_wid, self.panelw_hei = self.scr_wid - 2 - self.boardw_wid, self.scr_hei - 2
+        self.boardw_wid, self.boardw_hei = max(2 * (self.scr_wid - 2) / 3, 0), max(self.scr_hei - 2, 0)
+        self.panelw_wid, self.panelw_hei = max(self.scr_wid - 2 - self.boardw_wid, 0), max(self.scr_hei - 3 - self.nplayers, 0)
+        self.playersw_wid, self.playersw_hei = self.panelw_wid, max(self.nplayers + 1, 0)
         self.boardw_ox, self.boardw_oy = 1, 1
-        self.panelw_ox, self.panelw_oy = self.boardw_ox + self.boardw_wid, 1
+        self.panelw_ox, self.panelw_oy = self.boardw_ox + self.boardw_wid, self.boardw_oy
+        self.playersw_ox, self.playersw_oy = self.panelw_ox, self.panelw_oy + self.panelw_hei
 
         self.cellsizex = self.cellsizex_inp
         self.board_wid = self.side * self.cellsizex + 1
@@ -68,9 +70,21 @@ class ui_curses:
 
         self.board_win = self.scr.subwin(self.boardw_hei, self.boardw_wid, self.boardw_oy, self.boardw_ox)
         self.panel_win = self.scr.subwin(self.panelw_hei, self.panelw_wid, self.panelw_oy, self.panelw_ox)
+        self.players_win = self.scr.subwin(self.playersw_hei, self.playersw_wid, self.playersw_oy, self.playersw_ox)
+
+        self.scr.border()
+        self.panel_win.bkgdset(ord(' '), curses.color_pair(1) | curses.A_REVERSE )
+        self.panel_win.scrollok(True)
+        self.panel_win.erase()
+        self.players_win.bkgdset(ord(' '), curses.color_pair(2) )
+        self.players_win.scrollok(False)
+        self.players_win.erase()
+        self.players_win.hline(0, 0, curses.ACS_HLINE, self.playersw_wid)
+
         logging.debug('ui_curses.update_win_size: scr_wid, scr_hei = %d x %d', self.scr_wid, self.scr_hei)
         logging.debug('                           boardw_wid, boardw_hei = %d x %d', self.boardw_wid, self.boardw_hei)
         logging.debug('                           panelw_wid, panelw_hei = %d x %d', self.panelw_wid, self.panelw_hei)
+        logging.debug('                           playersw_wid, playersw_hei = %d x %d', self.playersw_wid, self.playersw_hei)
 
     def do_init(self,scr):
         """Initialises the curses system."""
@@ -82,8 +96,6 @@ class ui_curses:
         curses.init_pair(4, curses.COLOR_GREEN, curses.COLOR_BLACK)
 
         self.update_win_size()
-        self.scr.border()
-        self.panel_win.border()
 
     def draw_board(self, pp, barriers):
         """Pretty-print the board using curses"""
@@ -108,7 +120,7 @@ class ui_curses:
             if self.board_oy+y>=self.boardw_hei: break
             for x in range(1,self.cellsizex*self.side+1,self.cellsizex):
                 if self.board_ox+x>=self.boardw_wid: break
-                logging.debug('%d %d %d %d %d', self.board_ox, x, self.board_oy, y, self.boardw_wid)
+                #logging.debug('%d %d %d %d %d', self.board_ox, x, self.board_oy, y, self.boardw_wid)
                 self.board_win.addnstr(self.board_oy+y, self.board_ox+x, (self.cellsizex-1)*' ', self.boardw_wid-x-self.board_ox,
                     curses.color_pair(1) | curses.A_REVERSE )
 
@@ -306,14 +318,42 @@ class ui_curses:
     def warn(self):
         curses.flash()
 
+    def draw_players_win(self,pp,hactive):
+        """Draw the player window.
+
+        pp is the vector of Pawn objects.
+        hactive is the hash of the active player."""
+
+        y = 1
+
+        for p in pp:
+            if hactive == p.h:
+                reverse = curses.A_REVERSE
+            else:
+                reverse = curses.A_NORMAL
+            if p.ai:
+                prefix = "C "
+            else:
+                prefix = p.symbol + " "
+            self.players_win.addnstr(y, 0, prefix + p.h, self.playersw_wid, reverse )
+            y += 1
+
+        self.players_win.refresh()
+
+
+
     def get_input(self):
         """Get input from the user."""
         return self.scr.getch()
 
-    def draw_panel(self):
+    def clear_players_win(self):
+        """Draw the panel to communicate with the user."""
+        self.players_win.erase()
+        self.players_win.refresh()
+
+    def clear_panel(self):
         """Draw the panel to communicate with the user."""
         self.panel_win.erase()
-        self.panel_win.border()
         self.panel_win.refresh()
 
     def print_board_ascii(self):
@@ -382,4 +422,10 @@ class ui_curses:
 
         # Do the drawing
         for line in image: print line
+
+    def communicate(self,text):
+        """Print a string to the user"""
+        y,x=self.panel_win.getyx()
+        self.panel_win.addstr(y,1,text)
+        self.panel_win.refresh()
 
