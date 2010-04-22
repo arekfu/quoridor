@@ -73,7 +73,7 @@ class ui_curses:
         self.players_win = self.scr.subwin(self.playersw_hei, self.playersw_wid, self.playersw_oy, self.playersw_ox)
 
         self.scr.border()
-        self.panel_win.bkgdset(ord(' '), curses.color_pair(1) | curses.A_REVERSE )
+        self.panel_win.bkgdset(ord(' '), curses.color_pair(5) | curses.A_REVERSE )
         self.panel_win.scrollok(True)
         self.panel_win.erase()
         self.players_win.bkgdset(ord(' '), curses.color_pair(2) )
@@ -94,6 +94,7 @@ class ui_curses:
         curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
         curses.init_pair(4, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(5, curses.COLOR_BLUE, curses.COLOR_WHITE)
 
         self.update_win_size()
 
