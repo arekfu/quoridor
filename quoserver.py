@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import quoboard, quoui, random, time, curses.wrapper
+import quoboard, quoui, quoaiengine
+import random, time, curses.wrapper, copy
 
 from quoboard import up, right, down, left, vdir, logging
 
@@ -16,9 +17,12 @@ class Pawn:
         self.position=(x,y)
         self.symbol=symbol
         self.goal=goal
-        self.ai=ai
         alphabet='abcdefghijklmnopqrstuvwxyz'
         self.h=reduce(lambda a,b:a+b, [ random.choice(alphabet) for i in range(15) ] )
+        if ai:
+            self.ai = quoaiengine.QuoAIEngine(self.h)
+        else:
+            self.ai = None
 
     def move(self,position):
        self.position=position
@@ -117,9 +121,10 @@ class QuoServer:
                 self.ui.draw_board(self.serverboard.pp, self.serverboard.barriers)
                 self.ui.draw_players_win(self.serverboard.pp, self.serverboard.pp[i].h)
                 if self.serverboard.pp[i].ai:
-                    while(not self.serverboard.move_pawn(self.serverboard.pp[i].h,
-                        random.choice([up,right,down,left]))):
-                        pass
+                    #while(not self.serverboard.move_pawn(self.serverboard.pp[i].h,
+                    #    random.choice([up,right,down,left]))):
+                    #    pass
+                    self.serverboard.pp[i].ai.get_move(copy.deepcopy(self.serverboard))
                 else:
                     moved=False
                     while(not moved):

@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.DEBUG,
         datefmt='%a, %d %b %Y %H:%M:%S',
         filename=os.path.expanduser('~/.quoserver.log'))
 
+from collections import deque
 
 # Global variables
 global up, right, down, left
@@ -134,39 +135,56 @@ class Board:
         rules)"""
 
         for p in self.pp:
-            self.movesCO = [ line[:] for line in self.moves[:] ]
-            #if p.position == (0,4): pdb.set_trace()
-            if not self.can_win(p.position,p.goal): return True
+            if self.distance_to_goal(p.position,p.goal) < 0: return True
 
         return False
 
-    def can_win(self,p,g):
-        """Recursive function to determine if position p is connected with the
-        g side of the board"""
-        visited = 16
-        if g == up:
-            if p[1]==0: return True
-        elif g == right:
-            if p[0]==self.side-1: return True
-        elif g == down:
-            if p[1]==self.side-1: return True
+    def distance_to_goal(self, p, g):
+        """Calculate the distance to the goal.
+        
+        Calls a bfs algorithm to determine the shortest distance to all board
+        squares."""
+        import copy
+
+        queue = deque((tuple(p),))
+
+        dist = [ [ -1 for x in range(self.side) ] for y in range(self.side) ]
+        dist[p[0]][p[1]] = 0
+
+        moves = copy.deepcopy(self.moves)
+        self.bfs(queue, dist, moves)
+        if g == down:
+            return min(zip(*dist)[self.side-1])
         elif g == left:
-            if p[0]==0: return True
+            return min(dist[0])
+        elif g == up:
+            return min(zip(*dist)[0])
+        elif g == right:
+            return min(dist[self.side-1])
 
-        self.movesCO[p[0]][p[1]] |= visited
+    def bfs(self, queue, dist, moves):
+        """Breadth-first search of the shortest path to any board square."""
 
-        can=False
+        visited = 16
 
-        if self.movesCO[p[0]][p[1]] & up and not self.movesCO[p[0]][p[1]-1] & visited:
-            can |= self.can_win((p[0],p[1]-1),g)
-        if self.movesCO[p[0]][p[1]] & right and not self.movesCO[p[0]+1][p[1]] & visited:
-            can |= self.can_win((p[0]+1,p[1]),g)
-        if self.movesCO[p[0]][p[1]] & down and not self.movesCO[p[0]][p[1]+1] & visited:
-            can |= self.can_win((p[0],p[1]+1),g)
-        if self.movesCO[p[0]][p[1]] & left and not self.movesCO[p[0]-1][p[1]] & visited:
-            can |= self.can_win((p[0]-1,p[1]),g)
+        while(len(queue) > 0):
 
-        return can
+            p = queue.popleft()
+            moves[p[0]][p[1]] |= visited
+
+            if moves[p[0]][p[1]] & up and not moves[p[0]][p[1]-1] & visited:
+                queue.append( (p[0],p[1]-1) )
+                dist[p[0]][p[1]-1] = dist[p[0]][p[1]] + 1
+            if moves[p[0]][p[1]] & right and not moves[p[0]+1][p[1]] & visited:
+                queue.append( (p[0]+1,p[1]) )
+                dist[p[0]+1][p[1]] = dist[p[0]][p[1]] + 1
+            if moves[p[0]][p[1]] & down and not moves[p[0]][p[1]+1] & visited:
+                queue.append( (p[0],p[1]+1) )
+                dist[p[0]][p[1]+1] = dist[p[0]][p[1]] + 1
+            if moves[p[0]][p[1]] & left and not moves[p[0]-1][p[1]] & visited:
+                queue.append( (p[0]-1,p[1]) )
+                dist[p[0]-1][p[1]] = dist[p[0]][p[1]] + 1
+
 
     def add_barrier(self,barrier):
         """Add a new barrier if allowed"""
