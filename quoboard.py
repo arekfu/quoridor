@@ -20,12 +20,18 @@ up=1
 right=2
 down=4
 left=8
+enqueued = 1
+visited = 2
+visited_or_enqueued = visited | enqueued
+mask = ~visited_or_enqueued
 vdir={
                 up:     (0,-1),
                 right:  (1,0),
                 down:   (0,1),
                 left:   (-1,0)
             }
+length = 2
+
 
 
 # Class definitions
@@ -55,6 +61,9 @@ class Barrier:
                 self.direction=right
             else:
                 self.direction=down
+
+    def __eq__(self, other):
+        return self.position == other.position and self.direction == other.direction and self.length == other.length
 
     def intersects_with(self,other):
         """Determine if two barriers intersect each other"""
@@ -135,74 +144,93 @@ class Board:
         rules)"""
 
         for p in self.pp:
-            if self.distance_to_goal(p.position,p.goal) < 0: return True
+            d = self.distance_to_goal(p)
+            if d < 0:
+                logging.debug('%s %d %d %d', p.h, p.position[0], p.position[1], d)
+                return True
+            #if self.distance_to_goal(p.position,p.goal) < 0: return True
 
         return False
 
-    def distance_to_goal(self, p, g):
-        """Calculate the distance to the goal.
-        
-        Calls a bfs algorithm to determine the shortest distance to all board
-        squares."""
-        import copy
-
-        queue = deque((tuple(p),))
+    def init_dist(self, g, moves_status):
 
         dist = [ [ -1 for x in range(self.side) ] for y in range(self.side) ]
-        dist[p[0]][p[1]] = 0
-
-        moves = copy.deepcopy(self.moves)
-        self.bfs(queue, dist, moves)
         if g == down:
-            return min(zip(*dist)[self.side-1])
+            for x in range(self.side):
+                dist[x][self.side-1] = 0
+                moves_status[x][self.side-1] |= enqueued
+            queue = deque([(x, self.side-1) for x in range(self.side)])
         elif g == left:
-            return min(dist[0])
+            for y in range(self.side):
+                dist[0][y] = 0
+                moves_status[0][y] |= enqueued
+            queue = deque([(0, y) for y in range(self.side)])
         elif g == up:
-            return min(zip(*dist)[0])
+            for x in range(self.side):
+                dist[x][0] = 0
+                moves_status[x][0] |= enqueued
+            queue = deque([(x, 0) for x in range(self.side)])
         elif g == right:
-            return min(dist[self.side-1])
+            for y in range(self.side):
+                dist[self.side-1][y] = 0
+                moves_status[self.side-1][y] |= enqueued
+            queue = deque([(self.side-1, y) for y in range(self.side)])
 
-    def bfs(self, queue, dist, moves):
+        self.bfs(queue, dist, moves_status)
+
+        return dist
+
+    def bfs(self, queue, dist, moves_status):
         """Breadth-first search of the shortest path to any board square."""
 
-        visited = 16
+        logging.debug("bfs: queue = %s", repr(queue))
+        while queue:
 
-        while(len(queue) > 0):
+#            if not hasattr(self, 'notfirst'):
+#                for x in range(self.side):
+#                    logging.debug('%s', repr(dist[x]))
 
             p = queue.popleft()
-            moves[p[0]][p[1]] |= visited
+            for y in range(self.side):
+                logging.debug("bfs: dist, moves_status = %s\t%s", repr([dist[x][y] for x in range(self.side)]), repr([moves_status[x][y] for x in range(self.side)]))
+            logging.debug("")
+#            if p == pf:
+#                break
+            moves_status[p[0]][p[1]] |= visited
 
-            if moves[p[0]][p[1]] & up and not moves[p[0]][p[1]-1] & visited:
+            if self.moves[p[0]][p[1]] & up and not moves_status[p[0]][p[1]-1] & visited_or_enqueued:
                 queue.append( (p[0],p[1]-1) )
+                moves_status[p[0]][p[1]-1] |= enqueued
                 dist[p[0]][p[1]-1] = dist[p[0]][p[1]] + 1
-            if moves[p[0]][p[1]] & right and not moves[p[0]+1][p[1]] & visited:
+            if self.moves[p[0]][p[1]] & right and not moves_status[p[0]+1][p[1]] & visited_or_enqueued:
                 queue.append( (p[0]+1,p[1]) )
+                moves_status[p[0]+1][p[1]] |= enqueued
                 dist[p[0]+1][p[1]] = dist[p[0]][p[1]] + 1
-            if moves[p[0]][p[1]] & down and not moves[p[0]][p[1]+1] & visited:
+            if self.moves[p[0]][p[1]] & down and not moves_status[p[0]][p[1]+1] & visited_or_enqueued:
                 queue.append( (p[0],p[1]+1) )
+                moves_status[p[0]][p[1]+1] |= enqueued
                 dist[p[0]][p[1]+1] = dist[p[0]][p[1]] + 1
-            if moves[p[0]][p[1]] & left and not moves[p[0]-1][p[1]] & visited:
+            if self.moves[p[0]][p[1]] & left and not moves_status[p[0]-1][p[1]] & visited_or_enqueued:
                 queue.append( (p[0]-1,p[1]) )
+                moves_status[p[0]-1][p[1]] |= enqueued
                 dist[p[0]-1][p[1]] = dist[p[0]][p[1]] + 1
 
+        #self.clean_moves()
+#        if not hasattr(self, 'notfirst'):
+#            self.notfirst = True
+#            logging.debug('result of first BFS search:')
+#            for x in range(self.side):
+#                logging.debug('%s', repr(dist[x]))
+                
+        return dist
 
-    def add_barrier(self,barrier):
-        """Add a new barrier if allowed"""
-        if self.check_barrier(barrier):
-            self.add_barrier_to_map(barrier)
-            # Check if new barrier closes off one of the pawns
-            if self.are_pawns_closed_off():
-                self.remove_barrier_from_map(barrier)
-                logging.info("Barrier %s, %d, len=%d closes off some pawns, rejected", str(barrier.position), barrier.direction, barrier.length)
-                return False
-            else:
-                self.barriers.append(barrier)
-                return True
-        else:
-            logging.info("Barrier %s, %d, len=%d is illegal, rejected", str(barrier.position), barrier.direction, barrier.length)
-            return False
+    def clean_moves(self):
+        # Clean up
+        for x in range(self.side):
+            for y in range(self.side):
+                self.moves[x][y] &= mask
 
-    def add_barrier_to_map(self,barrier):
+    def add_barrier_to_map(self, barrier):
         """Update the moves map with the new barrier"""
         for pos in barrier.nodes():
             if barrier.direction == right:
@@ -212,7 +240,7 @@ class Board:
                 self.moves[pos[0]-1][pos[1]] &= ~right
                 self.moves[pos[0]][pos[1]]   &= ~left
 
-    def remove_barrier_from_map(self,barrier):
+    def remove_barrier_from_map(self, barrier):
         """Remove the barrier from the allowed moves"""
         for pos in barrier.nodes():
             if barrier.direction == right:
@@ -221,4 +249,14 @@ class Board:
             else:
                 self.moves[pos[0]-1][pos[1]] |= right
                 self.moves[pos[0]][pos[1]]   |= left
+
+    def check_win(self, h):
+        p = filter(lambda p: p.h==h, self.pp)[0]
+        if (p.goal == up and p.position[1] == 0) or \
+            (p.goal == right and p.position[0] == self.side-1) or \
+            (p.goal == down and p.position[1] == self.side-1) or \
+            (p.goal == left and p.position[0] == 0):
+               return True
+        else:
+            return False
 

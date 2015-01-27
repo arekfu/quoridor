@@ -29,6 +29,7 @@ class ui_curses:
         down = curses.KEY_DOWN
         left = curses.KEY_LEFT
         right = curses.KEY_RIGHT
+        debug = ord('d')
         quit = ord('q')
         barrier = ord('b')
 
@@ -85,6 +86,8 @@ class ui_curses:
         logging.debug('                           boardw_wid, boardw_hei = %d x %d', self.boardw_wid, self.boardw_hei)
         logging.debug('                           panelw_wid, panelw_hei = %d x %d', self.panelw_wid, self.panelw_hei)
         logging.debug('                           playersw_wid, playersw_hei = %d x %d', self.playersw_wid, self.playersw_hei)
+
+        self.scr.refresh()
 
     def do_init(self,scr):
         """Initialises the curses system."""
@@ -319,7 +322,7 @@ class ui_curses:
     def warn(self):
         curses.flash()
 
-    def draw_players_win(self,pp,hactive):
+    def draw_players_win(self, pp, hactive):
         """Draw the player window.
 
         pp is the vector of Pawn objects.
@@ -333,18 +336,41 @@ class ui_curses:
             else:
                 reverse = curses.A_NORMAL
             if p.ai:
-                prefix = "C "
+                prefix = "C" + p.symbol + " "
             else:
-                prefix = p.symbol + " "
+                prefix = "P" + p.symbol + " "
             self.players_win.addnstr(y, 0, prefix + p.h, self.playersw_wid, reverse )
             y += 1
 
         self.players_win.refresh()
 
+    def set_thinking(self, pp, h):
+        """While AI thinks, player's symbol blinks."""
+        # This should be really done with chgat, but for some reason it won't
+        # run
+        y = 1
+        for p in pp:
+            if h == p.h:
+                prefix = "C" + p.symbol 
+                self.players_win.addnstr(y, 0, prefix, self.playersw_wid, curses.A_REVERSE | curses.A_BLINK )
+                break
+            y += 1
+        self.players_win.refresh()
 
+    def unset_thinking(self, pp, h):
+        """When AI stops thinking, player's symbol stops blinking."""
+        y = 1
+        for p in pp:
+            if h == p.h:
+                prefix = "C" + p.symbol
+                self.players_win.addnstr(y, 0, prefix, self.playersw_wid, curses.A_REVERSE )
+                break
+            y += 1
+        self.players_win.refresh()
 
     def get_input(self):
         """Get input from the user."""
+        curses.flushinp()
         return self.scr.getch()
 
     def clear_players_win(self):

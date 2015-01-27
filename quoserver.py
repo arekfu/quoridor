@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 import quoboard, quoui, quoaiengine
-import random, time, curses.wrapper, copy
+import random, time, curses.wrapper#, copy
 
-from quoboard import up, right, down, left, vdir, logging
+from quoboard import up, right, down, left, vdir, logging, length, enqueued, visited, visited_or_enqueued
+from collections import deque
 
 
 
@@ -24,6 +25,9 @@ class Pawn:
         else:
             self.ai = None
 
+    def __eq__(self, other):
+        return self.h == other.h
+
     def move(self,position):
        self.position=position
        return self.position
@@ -33,12 +37,12 @@ class ServerBoard(quoboard.Board):
 
     Includes methods to add barriers and update the table of allowed moves"""
 
-    def __init__(self,side,nplayers,player_ai):
+    def __init__(self, side, nplayers, player_ai):
         """A simple constructor, performs some sanity checks"""
         if nplayers < 2 or nplayers > 4:
             logging.critical('Barrier length must be >0 and <side length')
             raise
-        quoboard.Board.__init__(self,side)
+        quoboard.Board.__init__(self, side)
 
         initialised=False
         while(not initialised):
@@ -60,7 +64,131 @@ class ServerBoard(quoboard.Board):
             for h in hs:
                 if hs.count(h) > 1: initialised=False
 
-    def move_pawn(self,h,direction):
+        self.dists = []
+        self.moves_status = [
+            [ [ 0 for x in range(self.side) ] for y in range(self.side) ]
+            for i in range(self.nplayers) ]
+        for i in range(self.nplayers):
+            self.dists.append( self.init_dist(self.pp[i].goal, self.moves_status[i]) )
+
+    def reconsider_dists(self, barrier):
+
+        for i in range(self.nplayers):
+ #           logging.debug('goal: %d', self.pp[i].goal)
+            stack = []
+            # Populate the stack
+            for pos in barrier.nodes():
+                if barrier.direction == right:
+                    if self.dists[i][pos[0]][pos[1]] > self.dists[i][pos[0]][pos[1]-1]:
+                        stack.append((pos[0],pos[1]))
+                        self.moves_status[i][pos[0]][pos[1]] = 0
+                    elif self.dists[i][pos[0]][pos[1]] < self.dists[i][pos[0]][pos[1]-1]:
+                        stack.append((pos[0],pos[1]-1))
+                        self.moves_status[i][pos[0]][pos[1]-1] = 0
+                else:
+                    if self.dists[i][pos[0]][pos[1]] > self.dists[i][pos[0]-1][pos[1]]:
+                        stack.append((pos[0],pos[1]))
+                        self.moves_status[i][pos[0]][pos[1]] = 0
+                    elif self.dists[i][pos[0]][pos[1]] < self.dists[i][pos[0]-1][pos[1]]:
+                        stack.append((pos[0]-1,pos[1]))
+                        self.moves_status[i][pos[0]-1][pos[1]] = 0
+#            logging.debug('goal, stack in reconsider_dist: %d %s', self.pp[i].goal, repr(stack))
+#            for y in range(self.side):
+#                logging.debug("reconsider_dist: dist, moves_status = %s\t%s", repr([self.dists[i][x][y] for x in range(self.side)]), repr([self.moves_status[i][x][y] for x in range(self.side)]))
+#            logging.debug("")
+
+            stack2 = []
+            while stack:
+                p = stack.pop()
+                stack2.append(p)
+                if self.moves[p[0]][p[1]] & up and self.moves_status[i][p[0]][p[1]-1] != 0 and self.dists[i][p[0]][p[1]-1] - self.dists[i][p[0]][p[1]] == 1:
+                    stack.append( (p[0],p[1]-1) )
+                    self.moves_status[i][p[0]][p[1]-1] = 0
+                if self.moves[p[0]][p[1]] & right and self.moves_status[i][p[0]+1][p[1]] != 0 and self.dists[i][p[0]+1][p[1]] - self.dists[i][p[0]][p[1]] == 1:
+                    stack.append( (p[0]+1,p[1]) )
+                    self.moves_status[i][p[0]+1][p[1]] = 0
+                if self.moves[p[0]][p[1]] & down and self.moves_status[i][p[0]][p[1]+1] != 0 and self.dists[i][p[0]][p[1]+1] - self.dists[i][p[0]][p[1]] == 1:
+                    stack.append( (p[0],p[1]+1) )
+                    self.moves_status[i][p[0]][p[1]+1] = 0
+                if self.moves[p[0]][p[1]] & left and self.moves_status[i][p[0]-1][p[1]] != 0 and self.dists[i][p[0]-1][p[1]] - self.dists[i][p[0]][p[1]] == 1:
+                    stack.append( (p[0]-1,p[1]) )
+                    self.moves_status[i][p[0]-1][p[1]] = 0
+
+#            logging.debug('goal, stack2 in reconsider_dist: %d %s', self.pp[i].goal, repr(stack2))
+#            for y in range(self.side):
+#                logging.debug("reconsider_dist: dist, moves_status = %s\t%s", repr([self.dists[i][x][y] for x in range(self.side)]), repr([self.moves_status[i][x][y] for x in range(self.side)]))
+#            logging.debug("")
+
+            queue = []
+            while stack2:
+                p = stack2.pop()
+#                logging.debug('p: %d %d', p[0], p[1])
+                if self.moves[p[0]][p[1]] & up and self.moves_status[i][p[0]][p[1]-1] != 0:
+                    queue.append( (p[0],p[1]-1) )
+                    self.moves_status[i][p[0]][p[1]-1] = visited_or_enqueued
+                if self.moves[p[0]][p[1]] & right and self.moves_status[i][p[0]+1][p[1]] != 0:
+                    queue.append( (p[0]+1,p[1]) )
+                    self.moves_status[i][p[0]+1][p[1]] = visited_or_enqueued
+                if self.moves[p[0]][p[1]] & down and self.moves_status[i][p[0]][p[1]+1] != 0:
+                    queue.append( (p[0],p[1]+1) )
+                    self.moves_status[i][p[0]][p[1]+1] = visited_or_enqueued
+                if self.moves[p[0]][p[1]] & left and self.moves_status[i][p[0]-1][p[1]] != 0:
+                    queue.append( (p[0]-1,p[1]) )
+                    self.moves_status[i][p[0]-1][p[1]] = visited_or_enqueued
+
+#            logging.debug('goal, queue in reconsider_dist: %d %s', self.pp[i].goal, repr(queue))
+#            for y in range(self.side):
+#                logging.debug("reconsider_dist: dist, moves_status = %s\t%s", repr([self.dists[i][x][y] for x in range(self.side)]), repr([self.moves_status[i][x][y] for x in range(self.side)]))
+#            logging.debug("")
+
+            if queue:
+                min_pos = min(queue, key=lambda p: self.dists[i][p[0]][p[1]])
+                queue = deque( filter(lambda p: self.dists[i][p[0]][p[1]] == self.dists[i][min_pos[0]][min_pos[1]], queue) )
+#            logging.debug('goal, queue in reconsider_dist: %d %s', self.pp[i].goal, repr(queue))
+
+            while queue:
+                newqueue = []
+                while queue:
+                    p = queue.popleft()
+                    self.moves_status[i][p[0]][p[1]] |= visited
+#                    logging.debug('p: %d %d', p[0], p[1])
+                    if self.moves[p[0]][p[1]] & up and self.moves_status[i][p[0]][p[1]-1] == 0:
+                        newqueue.append( (p[0],p[1]-1) )
+                        self.moves_status[i][p[0]][p[1]-1] = visited_or_enqueued
+                        self.dists[i][p[0]][p[1]-1] = self.dists[i][p[0]][p[1]] + 1
+                    if self.moves[p[0]][p[1]] & right and self.moves_status[i][p[0]+1][p[1]] == 0:
+                        newqueue.append( (p[0]+1,p[1]) )
+                        self.moves_status[i][p[0]+1][p[1]] = visited_or_enqueued
+                        self.dists[i][p[0]+1][p[1]] = self.dists[i][p[0]][p[1]] + 1
+                    if self.moves[p[0]][p[1]] & down and self.moves_status[i][p[0]][p[1]+1] == 0:
+                        newqueue.append( (p[0],p[1]+1) )
+                        self.moves_status[i][p[0]][p[1]+1] = visited_or_enqueued
+                        self.dists[i][p[0]][p[1]+1] = self.dists[i][p[0]][p[1]] + 1
+                    if self.moves[p[0]][p[1]] & left and self.moves_status[i][p[0]-1][p[1]] == 0:
+                        newqueue.append( (p[0]-1,p[1]) )
+                        self.moves_status[i][p[0]-1][p[1]] = visited_or_enqueued
+                        self.dists[i][p[0]-1][p[1]] = self.dists[i][p[0]][p[1]] + 1
+                if newqueue:
+                    min_pos = min(newqueue, key=lambda p: self.dists[i][p[0]][p[1]] )
+                    queue = deque( filter(lambda p: self.dists[i][p[0]][p[1]] == self.dists[i][min_pos[0]][min_pos[1]], newqueue) )
+#            for y in range(self.side):
+#                logging.debug("reconsider_dist: dist, moves_status = %s\t%s", repr([self.dists[i][x][y] for x in range(self.side)]), repr([self.moves_status[i][x][y] for x in range(self.side)]))
+#            logging.debug("")
+
+    def distance_to_goal(self, p):
+        """Calculate the distance to the goal.
+        
+        Calls a bfs algorithm to determine the shortest distance to all board
+        squares."""
+
+        dist = self.dists[self.pp.index(p)][p.position[0]][p.position[1]]
+
+        if dist > 0:
+            return dist
+        else:
+            return -1
+
+    def move_pawn(self, h, direction):
         """Check if the proposed move is allowed for the pawn identified by
         hash h"""
 
@@ -98,6 +226,53 @@ class ServerBoard(quoboard.Board):
             p.move(posnew)
             return True
 
+    def add_barrier(self, barrier):
+        """Add a new barrier if allowed"""
+        if self.check_barrier(barrier):
+            self.add_barrier_to_map(barrier)
+            self.reconsider_dists(barrier)
+            # Check if new barrier closes off one of the pawns
+            if self.are_pawns_closed_off():
+                self.remove_barrier_from_map(barrier)
+                self.reconsider_dists(barrier)
+                #logging.info("Barrier %s, %d, len=%d closes off some pawns, rejected", str(barrier.position), barrier.direction, barrier.length)
+                return False
+            else:
+                self.barriers.append(barrier)
+                return True
+        else:
+            #logging.info("Barrier %s, %d, len=%d is illegal, rejected", str(barrier.position), barrier.direction, barrier.length)
+            return False
+
+    def remove_barrier(self, barrier):
+        """Remove a barrier"""
+        self.remove_barrier_from_map(barrier)
+        #logging.debug("nbarriers: %d", len(self.barriers))
+        #for b in self.barriers:
+        #    logging.debug("barrier: x, y == %d, %d, d == %d", b.position[0], b.position[1], b.direction)
+        self.barriers.remove(barrier)
+        self.reconsider_dists(barrier)
+
+    def apply_move(self, h, m):
+        """Apply a move to the board"""
+        p = filter(lambda p: p.h==h, self.pp)[0]
+        if m.s[0] == 'm':
+            return self.move_pawn(h, int(m.s[2]))
+        elif m.s[0] == 'b':
+            mspl = m.s.split()
+            return self.add_barrier(quoboard.Barrier(
+                int(mspl[1]), int(mspl[2]), int(mspl[3]), length))
+
+    def restore_move(self, h, m):
+        """Take back a move from the board"""
+        p = filter(lambda p: p.h==h, self.pp)[0]
+        if m.s[0] == 'm':
+            return self.move_pawn(h, (int(m.s[2]) << 2) % 15)
+        elif m.s[0] == 'b':
+            mspl = m.s.split()
+            return self.remove_barrier(
+                quoboard.Barrier(int(mspl[1]), int(mspl[2]), int(mspl[3]), length))
+
 class QuoServer:
 
     def __init__(self):
@@ -124,7 +299,13 @@ class QuoServer:
                     #while(not self.serverboard.move_pawn(self.serverboard.pp[i].h,
                     #    random.choice([up,right,down,left]))):
                     #    pass
-                    self.serverboard.pp[i].ai.get_move(copy.deepcopy(self.serverboard))
+                    self.ui.set_thinking(self.serverboard.pp, self.serverboard.pp[i].h)
+                    self.serverboard.apply_move(
+                        self.serverboard.pp[i].h,
+                        #self.serverboard.pp[i].ai.get_move(copy.deepcopy(self.serverboard))
+                        self.serverboard.pp[i].ai.get_move(self.serverboard)
+                        )
+                    self.ui.unset_thinking(self.serverboard.pp, self.serverboard.pp[i].h)
                 else:
                     moved=False
                     while(not moved):
@@ -138,12 +319,14 @@ class QuoServer:
                             moved = self.serverboard.move_pawn(self.serverboard.pp[i].h, up)
                         elif c == self.ui.inp.down:
                             moved = self.serverboard.move_pawn(self.serverboard.pp[i].h, down)
+                        elif c == self.ui.inp.debug:
+                            logging.setLevel(logging.DEBUG)
                         elif c == self.ui.inp.barrier:
                             moved = self.choose_barrier()
                         if not moved:
                             self.ui.communicate("Illegal move, P" + self.serverboard.pp[i].symbol + "!\n")
                             self.ui.warn()
-                if self.check_win(i):
+                if self.serverboard.check_win(self.serverboard.pp[i].h):
                     self.win(i)
                     return
 
@@ -180,7 +363,6 @@ class QuoServer:
 
         self.ui.delete_old_barrier_cursor(False)
         # Now choose the barrier orientation
-        length=2
         if pos_curs[0]<self.side-length+1:
             direction=right
         else:
@@ -222,17 +404,6 @@ class QuoServer:
         self.ui.delete_old_barrier(not result)
         return result
 
-    def check_win(self,i):
-        p = self.serverboard.pp[i]
-        if (p.goal == up and p.position[1] == 0) or \
-            (p.goal == right and p.position[0] == self.side-1) or \
-            (p.goal == down and p.position[1] == self.side-1) or \
-            (p.goal == left and p.position[0] == 0):
-               return True
-        else:
-            return False
-        pass
-
     def win(self,i):
         pass
 
@@ -260,7 +431,7 @@ class QuoServer:
             cfgfilename=os.path.expanduser('~/.quoserver')
             f=open(cfgfilename,'r')
         except IOError:
-            logging.warning('Configuration file %s does not exist, creating a new one', cfgfilename) 
+            logging.info('Configuration file %s does not exist, creating a new one', cfgfilename) 
             self.create_default_config(cfgfilename)
             try:
                 f=open(cfgfilename,'r')
